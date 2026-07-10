@@ -43,6 +43,23 @@ class TransferDirection(Enum):
     DOWNLOAD = auto()
 
 @dataclass (frozen=True)
+class UserConfig:
+    sync_folder: str | None
+    server_url: str | None
+
+@dataclass (frozen=True)
+class ServerIdentity:
+    device_id: str | None
+    sync_space_id: str | None
+    access_token: str | None
+    refresh_token: str | None
+
+@dataclass (frozen=True)
+class ClientConfig:
+    user: UserConfig
+    identity: ServerIdentity
+
+@dataclass (frozen=True)
 class ScanResult:
     relative_path: str
     size_bytes: int
