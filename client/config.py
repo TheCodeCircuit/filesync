@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import os
 
@@ -32,21 +33,25 @@ class ConfigManager:
         return self.config
 
     def update_user_config(self, user_config):
-        self.config.user = user_config
+        # self.config is frozen -- build a new ClientConfig rather than
+        # assigning into the existing one (that would raise
+        # FrozenInstanceError at runtime).
+        self.config = dataclasses.replace(self.config, user=user_config)
         self.save()
 
     def update_identity(self, identity):
-        self.config.identity = identity
+        self.config = dataclasses.replace(self.config, identity=identity)
         self.save()
 
     def reset_identity(self):
-        self.config.identity = ServerIdentity(
+        empty_identity = ServerIdentity(
             device_id=None,
             sync_space_id=None,
             access_token=None,
             refresh_token=None
         )
 
+        self.config = dataclasses.replace(self.config, identity=empty_identity)
         self.save()
 
     def _default_config(self):
