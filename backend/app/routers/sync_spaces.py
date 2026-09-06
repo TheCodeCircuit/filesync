@@ -1,3 +1,7 @@
+"""
+Endpoints for creating and listing sync spaces.
+"""
+
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, status
