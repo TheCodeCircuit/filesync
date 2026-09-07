@@ -75,3 +75,25 @@ class SyncSpaceResponse(BaseModel):
     sync_space_id: str = Field(validation_alias="id")
     name: str
     created_at: datetime
+
+class FileMetadataResponse(BaseModel):
+    """
+    NOTE: this does NOT map directly from a single File row via
+    from_attributes, because version_id and file_hash actually live on
+    FileVersion, not File. Whatever builds this later has to join the
+    two tables and hand us the combined result explicitly.
+    """
+
+    relative_path: str
+    version_id: str
+    file_hash: str
+    size_bytes: int
+    deleted: bool
+    updated_at: datetime
+
+class FileListResponse(BaseModel):
+    """
+    The full response body for GET /sync-spaces/{sync_space_id}/files --
+    just a list of FileMetadataResponse wrapped in a "files" key.
+    """
+    files: list[FileMetadataResponse]
