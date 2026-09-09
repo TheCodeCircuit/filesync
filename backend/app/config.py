@@ -12,7 +12,6 @@ from pathlib import Path
 
 # Path(__file__) = the path to THIS file (config.py) itself.
 # .resolve() = convert it to a full, unambiguous absolute path
-#              (no "..", no relative shortcuts).
 # .parent = go up one folder (out of app/)
 # .parent again = go up one more folder (out of backend/)
 BASE_DIR = Path(__file__).resolve().parent.parent

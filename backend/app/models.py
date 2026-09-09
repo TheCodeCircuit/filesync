@@ -1,7 +1,7 @@
 """
 Defines our DATABASE TABLES as Python classes.
 
-Important distinction to keep straight (comes up constantly):
+Important distinction to keep straight:
   - models.py  = the shape of data IN THE DATABASE (internal truth)
   - schemas.py = the shape of data going OVER THE NETWORK (what the
     outside world sees in JSON)
@@ -45,7 +45,7 @@ class File(Base):
 
     # ForeignKey("sync_spaces.id") tells SQLAlchemy (and the database)
     # "this column's value must match an existing id in the
-    # sync_spaces table.
+    # sync_spaces table."
     sync_space_id: Mapped[str] = mapped_column(String(36), ForeignKey("sync_spaces.id"), nullable=False)
     relative_path: Mapped[str] = mapped_column(String(1000), nullable=False)
 
@@ -54,8 +54,7 @@ class File(Base):
     # It starts as None the instant a path is first known about.
     #
     # NOTE: deliberately NOT a real ForeignKey (problem at creating the database) 
-    # -- this avoids a circular table dependency with file_versions. Our own service code
-    # is responsible for keeping this accurate.
+    # -- this avoids a circular table dependency with file_versions.
     current_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
 
     # sqlite doesn't have boolean values, but sqlalchemy handles the 0s and 1s for us.

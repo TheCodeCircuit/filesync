@@ -15,7 +15,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class DeviceCreate(BaseModel):
     """
     What a client must send us in the body of POST /devices.
-    Matches API_CONTRACT.md's example: {"name": "Laptop"}
     """
 
     name: str = Field(min_length=1, max_length=100)
@@ -80,8 +79,7 @@ class FileMetadataResponse(BaseModel):
     """
     NOTE: this does NOT map directly from a single File row via
     from_attributes, because version_id and file_hash actually live on
-    FileVersion, not File. Whatever builds this later has to join the
-    two tables and hand us the combined result explicitly.
+    FileVersion, another table.
     """
 
     relative_path: str

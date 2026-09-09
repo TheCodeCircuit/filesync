@@ -1,9 +1,9 @@
 """
 Sets up the actual connection to our SQLite database.
 
-Big picture: FastAPI handles many requests. Each request that needs to
+FastAPI handles many requests. Each request that needs to
 touch the database should get its OWN safe connection ("session"), use
-it, then give it back. This file provides the machinery to do that
+it, then give it back. This file provides that
 consistently everywhere in the app, instead of every router file
 reinventing database-connection logic.
 """
