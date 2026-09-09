@@ -1,94 +1,84 @@
-from models import FileMetaData , Change , ChangeSet , ChangeType
+"""
+Change detection: diffs "what's on disk right now" against "what local_db
+last knew" and classifies each path as added/modified/deleted/unchanged.
 
-def detect_changes(current_data : list[FileMetaData] , previous_data : list[FileMetaData]):
+This is a pure function, deliberately -- same reasoning as sync_planner
+being a pure decision function with zero I/O. change_detector does not
+touch the filesystem (scanner/hasher already did that) and does not
+touch SQLite (local_db already did that). It just takes two already-
+materialized views of the world and diffs them. That makes it directly
+unit-testable with hand-built LocalFileState/SyncRecord fixtures, no
+tmp directories or real DB required.
 
-    current_lookup = build_lookup(current_data)
-    previous_lookup = build_lookup(previous_data)
+Composition with the modules already built:
 
-    added = detect_added(current_lookup, previous_lookup)
-    deleted = detect_deleted(current_lookup, previous_lookup)
-    modified , unchanged = detect_modified_and_unchanged(current_lookup, previous_lookup)
+    states = hasher.build_local_file_states(scanner.scan_dir(root), root)
+    previous = local_db_instance.get_all_records()
+    changes = detect_changes(states, previous)
+"""
 
-    final_change = ChangeSet(
-        added = added,
-        deleted = deleted,
-        modified = modified,
-        unchanged = unchanged
-    )
+from models import Change, ChangeSet, ChangeType, LocalFileState, SyncRecord
 
-    return final_change
 
-def build_lookup(data: list[FileMetaData]):
+def detect_changes(
+    current_states,
+    previous_records: dict[str, SyncRecord],
+) -> ChangeSet:
+    """
+    current_states: iterable of LocalFileState from this scan pass (any
+    iterable is fine -- it's fully consumed into a dict here, since
+    deletion detection requires knowing the complete current set before
+    it can tell what's missing from it).
 
-    lookup_table = {
-        file.relPath : file 
-        for file in data 
+    previous_records: dict[relative_path, SyncRecord] from
+    LocalDB.get_all_records() -- last known state per path.
+
+    Classification rules:
+      - Path in current scan, no previous record, OR previous record
+        exists but was itself a tombstone (deleted=True) -> ADDED.
+        A previously-deleted path reappearing is treated as new, not
+        "modified", since there's no meaningful prior version to diff
+        against from the sync engine's point of view.
+      - Path in current scan, previous record exists and isn't a
+        tombstone, hash differs -> MODIFIED.
+      - Path in current scan, previous record exists and isn't a
+        tombstone, hash matches -> UNCHANGED.
+      - Path in previous records (and not already a tombstone), missing
+        from current scan -> DELETED. Paths that were already tombstoned
+        and are still absent aren't re-reported -- there's nothing new
+        to say about them.
+    """
+    current_by_path: dict[str, LocalFileState] = {
+        state.relative_path: state for state in current_states
     }
 
-    return lookup_table
+    added: list[Change] = []
+    modified: list[Change] = []
+    unchanged: list[Change] = []
+    deleted: list[Change] = []
 
-def detect_added(curr_lookup : dict , old_lookup : dict):
+    for relative_path, state in current_by_path.items():
+        old_record = previous_records.get(relative_path)
 
-    added_changes = []
-
-    for path in curr_lookup:
-        if path not in old_lookup:
-            new_file = Change(
-                change_type = ChangeType.ADDED,
-                old_metadata = None,
-                new_metadata = curr_lookup[path]
+        if old_record is None or old_record.deleted:
+            added.append(
+                Change(relative_path, ChangeType.ADDED, old_record, state)
             )
-            
-            added_changes.append(new_file)
-
-    return added_changes
-
-def detect_deleted(curr_lookup : dict , old_lookup : dict):
-
-    deleted_changes = []
-
-    for path in old_lookup:
-        if path not in curr_lookup:
-            new_file = Change(
-                change_type = ChangeType.DELETED,
-                old_metadata = old_lookup[path],
-                new_metadata = None
+        elif state.file_hash != old_record.file_hash:
+            modified.append(
+                Change(relative_path, ChangeType.MODIFIED, old_record, state)
             )
-            
-            deleted_changes.append(new_file)
+        else:
+            unchanged.append(
+                Change(relative_path, ChangeType.UNCHANGED, old_record, state)
+            )
 
-    return deleted_changes
+    for relative_path, old_record in previous_records.items():
+        if old_record.deleted:
+            continue
+        if relative_path not in current_by_path:
+            deleted.append(
+                Change(relative_path, ChangeType.DELETED, old_record, None)
+            )
 
-def detect_modified_and_unchanged(curr_lookup : dict , old_lookup : dict):
-
-    modified_changes = []
-    unchanged = []
-
-    def create_change():
-        new_file = Change(
-        change_type = ChangeType.MODIFIED,
-        old_metadata = old_lookup[path],
-        new_metadata = curr_lookup[path]
-    )
-        modified_changes.append(new_file)
-        
-
-    for path in curr_lookup:
-        if path in old_lookup:
-            if curr_lookup[path].size != old_lookup[path].size:
-                create_change()
-            elif curr_lookup[path].mtime != old_lookup[path].mtime:
-                create_change()
-            elif curr_lookup[path].hash != old_lookup[path].hash:
-                create_change()
-            else:
-                new_file = Change(
-                change_type = ChangeType.UNCHANGED,
-                old_metadata = old_lookup[path],
-                new_metadata = curr_lookup[path]
-                )
-
-                unchanged.append(new_file)
-
-
-    return modified_changes,unchanged
+    return ChangeSet(added=added, deleted=deleted, modified=modified, unchanged=unchanged)
