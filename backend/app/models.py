@@ -4,7 +4,7 @@ Defines our DATABASE TABLES as Python classes.
 Important distinction to keep straight (comes up constantly):
   - models.py  = the shape of data IN THE DATABASE (internal truth)
   - schemas.py = the shape of data going OVER THE NETWORK (what the
-                 outside world sees in JSON)
+    outside world sees in JSON)
 """
 
 from datetime import datetime, timezone
